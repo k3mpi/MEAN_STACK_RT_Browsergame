@@ -3,6 +3,10 @@ import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
 
+
+import { SocketIoModule } from 'ngx-socket-io';
+import { SocketService } from './_services/socket.service';
+
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { LoginComponent } from './login/login.component';
@@ -14,6 +18,7 @@ import { BoardModeratorComponent } from './board-moderator/board-moderator.compo
 import { BoardUserComponent } from './board-user/board-user.component';
 
 import { httpInterceptorProviders } from './_helpers/http.interceptor';
+import { GameComponent } from './game/game/game.component';
 
 @NgModule({
   declarations: [
@@ -24,15 +29,20 @@ import { httpInterceptorProviders } from './_helpers/http.interceptor';
     ProfileComponent,
     BoardAdminComponent,
     BoardModeratorComponent,
-    BoardUserComponent
+    BoardUserComponent,
+    GameComponent
   ],
   imports: [
     BrowserModule,
     AppRoutingModule,
     FormsModule,
-    HttpClientModule
+    HttpClientModule,
+    SocketIoModule.forRoot({ url: 'localhost:8080' }),
   ],
-  providers: [httpInterceptorProviders],
+  providers: [
+    SocketService,
+    httpInterceptorProviders],
+    
   bootstrap: [AppComponent]
 })
 export class AppModule { }

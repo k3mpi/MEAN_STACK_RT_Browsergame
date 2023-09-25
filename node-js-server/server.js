@@ -1,30 +1,32 @@
 const express = require("express");
 const cors = require("cors");
 const cookieSession = require("cookie-session");
+const http = require("http"); // Importiere das http-Modul
 
 const dbConfig = require("./app/config/db.config");
 
 const app = express();
+const server = http.createServer(app); // Erstelle einen HTTP-Server und verknüpfe ihn mit Express
 
-app.use(cors());
-/* for Angular Client (withCredentials) */
-// app.use(
-//   cors({
-//     credentials: true,
-//     origin: ["http://localhost:8081"],
-//   })
-// );
+const mongoose = require('mongoose');
+const socketIo = require("socket.io"); // Füge die Socket.IO-Bibliothek hinzu
 
-// parse requests of content-type - application/json
+
+mongoose.set('strictQuery', false);
+
+const corsOptions = {
+  origin: "http://localhost:4200",
+  credentials: false,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
-
-// parse requests of content-type - application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cookieSession({
     name: "bezkoder-session",
-    keys: ["COOKIE_SECRET"], // should use as secret environment variable
+    keys: ["COOKIE_SECRET"],
     httpOnly: true
   })
 );
@@ -46,19 +48,52 @@ db.mongoose
     process.exit();
   });
 
-// simple route
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to bezkoder application." });
 });
 
-// routes
 require("./app/routes/auth.routes")(app);
 require("./app/routes/user.routes")(app);
 
-// set port, listen for requests
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}.`);
+});
+
+const io = socketIo(server, {
+  cors: {
+    origin: "http://localhost:4200",
+    methods: ["GET", "POST"]
+  }
+});
+// Erstelle eine Socket.IO-Instanz, die denselben Server verwendet
+
+io.on("connection", (socket) => {
+  console.log("A user connected");
+
+  socket.on("disconnect", () => {
+    console.log("A user disconnected");
+  });
+
+  // Event-Handler für "movePlayer"
+  socket.on("movePlayer", (data) => {
+    // Hier können Sie die Logik für die Bewegung des Spielers verarbeiten
+    console.log("Received movePlayer message:", data);
+    // Führen Sie die entsprechende Aktion aus und senden Sie Ergebnisse an andere Clients
+  });
+
+  // Event-Handler für "shoot"
+  socket.on("shoot", (data) => {
+    // Hier können Sie die Logik für das Schießen des Spielers verarbeiten
+    console.log("Received shoot message:", data);
+
+    // Führen Sie die gewünschte Aktion aus, z. B. eine Antwort vorbereiten
+    const response = `Typ "${data}" abgefeuert`;
+
+    // Senden Sie die Antwort an den Client zurück
+    socket.emit("shootResponse", response);
+  });
 });
 
 function initial() {
