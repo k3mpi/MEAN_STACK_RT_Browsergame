@@ -18,6 +18,7 @@ export class GameComponent implements OnInit, OnDestroy {
   canvasWidth = 800; // Breite des Canvas (Sichtfensters)
   canvasHeight = 800; // Höhe des Canvas (Sichtfensters)
   canvas: any;
+  backgroundImage = new Image();
 
   private animationFrameId!: number;
   private fpsInterval: number = 1000 / 30; // 30 FPS
@@ -30,10 +31,12 @@ export class GameComponent implements OnInit, OnDestroy {
 
 
   ngOnInit(): void {
+    
     // ... (bereits vorhandener Code)
 
     // Starte die Game-Loop
     this.socketService.connectSocket(); // Verbindung zum Socket.IO-Server herstellen
+    this.backgroundImage.src = 'assets/background.jpg';
     this.mapService.getCreateMap().subscribe(
       (data: any) => {
         this.map = data; // Assuming that the response is the map data you need
@@ -48,9 +51,9 @@ export class GameComponent implements OnInit, OnDestroy {
       }
     );
     this.ctx = this.canvasRef.nativeElement.getContext('2d')!;
-   
+  
     this.user = { username: 'John' }; // Beispielbenutzer
-    this.startGameLoop();
+    this.startGameLoop();;
   }
 
   ngOnDestroy(): void {
@@ -117,6 +120,23 @@ export class GameComponent implements OnInit, OnDestroy {
       // Hier kannst du Server-Nachrichten verarbeiten
     });
   }
+  drawBackground() {
+    if (!this.ctx || !this.map) return;
+    
+    // Berechne die Position des Hintergrundbildes basierend auf der Kameraposition und einem Parallax-Faktor
+    const parallaxFactor = 0.1; // Anpassen, um die Parallax-Geschwindigkeit zu steuern
+    const backgroundX = -(this.cameraX * parallaxFactor);
+    const backgroundY = -(this.cameraY * parallaxFactor);
+    
+    // Berechne die Größe des Hintergrundbildes basierend auf dem Zoom-Faktor
+    const zoomFactor = 3; // Anpassen, um den Zoom zu steuern
+    const backgroundWidth = this.canvasWidth * zoomFactor;
+    const backgroundHeight = this.canvasHeight * zoomFactor;
+  
+    // Zeichne das Hintergrundbild unter Berücksichtigung der berechneten Position und Größe
+    this.ctx.drawImage(this.backgroundImage, backgroundX, backgroundY, backgroundWidth, backgroundHeight);
+  }
+  
   drawTilemap() {
     console.log("draw tilemap");
     if (!this.ctx || !this.map) return;
@@ -145,7 +165,7 @@ export class GameComponent implements OnInit, OnDestroy {
           // Zeichne ein schwarzes Rechteck für den Wert 0
        
           //this.ctx.fillStyle = 'black';
-          this.ctx.fillRect(tileX, tileY, this.tileSize, this.tileSize);
+          //this.ctx.fillRect(tileX, tileY, this.tileSize, this.tileSize);
         }
       }
     }
@@ -156,6 +176,12 @@ export class GameComponent implements OnInit, OnDestroy {
     if (!this.ctx || !this.map) return;
     // Hier erfolgt die Zeichenlogik, z.B. Spieler und Raketen zeichnen
     // Verwende this.ctx, um auf den 2D-Kontext des Canvas zuzugreifen
+
+    // Zeichne den Hintergrund
+    this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+    this.drawBackground();
+
+
     this.drawTilemap();
   }
   @HostListener('document:keydown', ['$event'])
