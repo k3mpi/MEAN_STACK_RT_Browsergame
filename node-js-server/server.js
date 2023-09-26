@@ -16,7 +16,7 @@ mongoose.set('strictQuery', false);
 
 const corsOptions = {
   origin: "http://localhost:4200",
-  credentials: false,
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
@@ -54,6 +54,7 @@ app.get("/", (req, res) => {
 
 require("./app/routes/auth.routes")(app);
 require("./app/routes/user.routes")(app);
+require("./app/routes/tilemap.routes")(app);
 
 const PORT = process.env.PORT || 8080;
 

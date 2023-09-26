@@ -1,6 +1,8 @@
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, ViewChild, ElementRef, Renderer2 } from '@angular/core';
 import { UserService } from 'src/app/_services/user.service';
+import { MapService } from 'src/app/game_services/map.service';
 import { SocketService } from 'src/app/_services/socket.service';
+
 
 @Component({
   selector: 'app-game',
@@ -9,22 +11,44 @@ import { SocketService } from 'src/app/_services/socket.service';
 })
 export class GameComponent implements OnInit, OnDestroy {
   user: any;
-  players: any[] = [];
+  map!: number[][]; // Hier wird die Tilemap gespeichert
+  tileSize = 16; // Größe eines Tiles in Pixeln
+  cameraX = 0; // X-Position der Kamera
+  cameraY = 0; // Y-Position der Kamera
+  canvasWidth = 800; // Breite des Canvas (Sichtfensters)
+  canvasHeight = 800; // Höhe des Canvas (Sichtfensters)
   canvas: any;
-  ctx: any;
 
   private animationFrameId!: number;
   private fpsInterval: number = 1000 / 30; // 30 FPS
 
-  constructor(private userService: UserService, private socketService: SocketService) { }
+  @ViewChild('gameCanvas', { static: true })
+  canvasRef!: ElementRef<HTMLCanvasElement>;
+  ctx: CanvasRenderingContext2D | undefined;
+
+  constructor(private userService: UserService, private socketService: SocketService, private mapService: MapService, private renderer: Renderer2) { }
+
 
   ngOnInit(): void {
     // ... (bereits vorhandener Code)
 
     // Starte die Game-Loop
     this.socketService.connectSocket(); // Verbindung zum Socket.IO-Server herstellen
-    
-
+    this.mapService.getCreateMap().subscribe(
+      (data: any) => {
+        this.map = data; // Assuming that the response is the map data you need
+        console.log(this.map);
+        console.log("map");
+  
+        this.user = { username: 'John' }; // Beispielbenutzer
+        this.startGameLoop();
+      },
+      (error: any) => {
+        console.error('Error loading map data', error);
+      }
+    );
+    this.ctx = this.canvasRef.nativeElement.getContext('2d')!;
+   
     this.user = { username: 'John' }; // Beispielbenutzer
     this.startGameLoop();
   }
@@ -52,28 +76,34 @@ export class GameComponent implements OnInit, OnDestroy {
   private startGameLoop(): void {
     let then = performance.now();
     let startTime = then;
+    const desiredFPS = 30; // Gewünschte FPS
+  
     const animate = (now: number) => {
       // Berechne die vergangene Zeit seit dem letzten Frame
       const elapsed = now - then;
-
-      // Führe das Spiel-Update aus (z.B. Bewegungen, Kollisionen, Socket-Kommunikation)
-      this.updateGame(elapsed);
-
-      // Zeichne das Spiel
-      this.drawGame();
-
-      then = now;
-
+  
+      // Wenn die vergangene Zeit größer als das gewünschte Intervall für die FPS ist,
+      // führe das Spiel-Update und die Zeichnung aus
+      if (elapsed > this.fpsInterval) {
+        then = now - (elapsed % this.fpsInterval); // Aktualisiere den letzten Zeitpunkt
+  
+        // Führe das Spiel-Update aus (z.B. Bewegungen, Kollisionen, Socket-Kommunikation)
+        this.updateGame(elapsed);
+  
+        // Zeichne das Spiel
+        this.drawGame();
+      }
+  
       // Fordere den nächsten Frame an
       this.animationFrameId = requestAnimationFrame(animate);
-
+  
       // Überprüfe, ob es Zeit ist, die FPS zu begrenzen
-      if (now - startTime >= this.fpsInterval) {
+      if (now - startTime >= 1000 / desiredFPS) {
         // Setze den Startzeitpunkt für den nächsten Frame
-        startTime = now - (now - startTime) % this.fpsInterval;
+        startTime = now - (now - startTime) % (1000 / desiredFPS);
       }
     };
-
+  
     // Starte die Animation
     this.animationFrameId = requestAnimationFrame(animate);
   }
@@ -87,17 +117,70 @@ export class GameComponent implements OnInit, OnDestroy {
       // Hier kannst du Server-Nachrichten verarbeiten
     });
   }
+  drawTilemap() {
+    console.log("draw tilemap");
+    if (!this.ctx || !this.map) return;
+  
+    const numRows = this.map.length;
+    const numCols = this.map[0].length;
+  
+    // Berechne den Bereich der sichtbaren Tiles
+    const startRow = Math.max(0, Math.floor(this.cameraY / this.tileSize) - 5);
+    const endRow = Math.min(numRows, Math.ceil((this.cameraY + this.canvasHeight) / this.tileSize) + 5);
+    const startCol = Math.max(0, Math.floor(this.cameraX / this.tileSize) - 5);
+    const endCol = Math.min(numCols, Math.ceil((this.cameraX + this.canvasWidth) / this.tileSize) + 5);
+  
+    for (let row = startRow; row < endRow; row++) {
+      for (let col = startCol; col < endCol; col++) {
+        const tileValue = this.map[row][col];
+        const tileX = col * this.tileSize - this.cameraX;
+        const tileY = row * this.tileSize - this.cameraY;
+  
+        if (tileValue === 1) {
+          // Lade das Tile aus deiner tilemap.png oder einem anderen Asset
+          const tileImage = new Image();
+          tileImage.src = 'assets/tilemap.png'; // Passe den Pfad entsprechend an
+          this.ctx.drawImage(tileImage, 96, 0, this.tileSize, this.tileSize, tileX, tileY, this.tileSize, this.tileSize);
+        } else {
+          // Zeichne ein schwarzes Rechteck für den Wert 0
+       
+          //this.ctx.fillStyle = 'black';
+          this.ctx.fillRect(tileX, tileY, this.tileSize, this.tileSize);
+        }
+      }
+    }
+  }
 
   // Funktion zum Zeichnen des Spiels (vereinfacht)
   private drawGame(): void {
+    if (!this.ctx || !this.map) return;
     // Hier erfolgt die Zeichenlogik, z.B. Spieler und Raketen zeichnen
     // Verwende this.ctx, um auf den 2D-Kontext des Canvas zuzugreifen
+    this.drawTilemap();
   }
   @HostListener('document:keydown', ['$event'])
   handleKeydownEvent(event: KeyboardEvent): void {
     if (event.key === ' ' || event.code === 'Space') {
-      // Wenn die Leertaste gedrückt wird, rufen Sie die "shoot"-Funktion auf
+      // Wenn die Leertaste gedrückt wird, rufe die "shoot"-Funktion auf
       this.shoot();
+    } else {
+      // Kamera-Steuerung mit WASD-Tasten
+      const speed = 4; // Anpassen Sie die Geschwindigkeit nach Bedarf
+
+      switch (event.key) {
+        case 'w':
+          this.cameraY -= speed;
+          break;
+        case 'a':
+          this.cameraX -= speed;
+          break;
+        case 's':
+          this.cameraY += speed;
+          break;
+        case 'd':
+          this.cameraX += speed;
+          break;
+      }
     }
   }
 }
