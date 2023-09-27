@@ -15,10 +15,23 @@ export class GameComponent implements OnInit, OnDestroy {
   tileSize = 16; // Größe eines Tiles in Pixeln
   cameraX = 0; // X-Position der Kamera
   cameraY = 0; // Y-Position der Kamera
-  canvasWidth = 800; // Breite des Canvas (Sichtfensters)
+  canvasWidth = 1200; // Breite des Canvas (Sichtfensters)
   canvasHeight = 800; // Höhe des Canvas (Sichtfensters)
   canvas: any;
   backgroundImage = new Image();
+
+  shipX = this.canvasWidth / 2; // X-Position des Raumschiffs (in der Mitte des Canvas)
+  shipY = this.canvasHeight / 2; // Y-Position des Raumschiffs (in der Mitte des Canvas)
+  shipAngle = 0; // Startwinkel des Raumschiffs (in Grad)
+  shipSpeed = 0; // Anfangsgeschwindigkeit des Raumschiffs
+  shipMaxSpeed = 5; // Maximale Geschwindigkeit des Raumschiffs
+
+  private shipVelocityX = 0; // Velocity in X direction
+  private shipVelocityY = 0; // Velocity in Y direction
+  private shipAcceleration = 0.1; // Acceleration factor
+  private shipFriction = 0.02; // Friction factor
+  private shipRotationSpeed = 5; // Rotation speed (in degrees per frame)
+
 
   private animationFrameId!: number;
   private fpsInterval: number = 1000 / 30; // 30 FPS
@@ -32,6 +45,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     
+ 
     // ... (bereits vorhandener Code)
 
     // Starte die Game-Loop
@@ -53,6 +67,10 @@ export class GameComponent implements OnInit, OnDestroy {
     this.ctx = this.canvasRef.nativeElement.getContext('2d')!;
   
     this.user = { username: 'John' }; // Beispielbenutzer
+    this.ctx = this.canvasRef.nativeElement.getContext('2d')!;
+    this.canvasRef.nativeElement.width = this.canvasWidth; // Neue Breite setzen
+    this.canvasRef.nativeElement.height = this.canvasHeight; // Neue Höhe setzen
+  
     this.startGameLoop();;
   }
 
@@ -82,40 +100,52 @@ export class GameComponent implements OnInit, OnDestroy {
     const desiredFPS = 30; // Gewünschte FPS
   
     const animate = (now: number) => {
-      // Berechne die vergangene Zeit seit dem letzten Frame
+      // Calculate time since the last frame
       const elapsed = now - then;
-  
-      // Wenn die vergangene Zeit größer als das gewünschte Intervall für die FPS ist,
-      // führe das Spiel-Update und die Zeichnung aus
+
+      // If enough time has passed, perform game update and draw
       if (elapsed > this.fpsInterval) {
-        then = now - (elapsed % this.fpsInterval); // Aktualisiere den letzten Zeitpunkt
-  
-        // Führe das Spiel-Update aus (z.B. Bewegungen, Kollisionen, Socket-Kommunikation)
+        then = now - (elapsed % this.fpsInterval);
+
+        // Perform game update (movement, collision, etc.)
         this.updateGame(elapsed);
-  
-        // Zeichne das Spiel
+
+        // Draw the game
         this.drawGame();
       }
-  
-      // Fordere den nächsten Frame an
+
+      // Request the next frame
       this.animationFrameId = requestAnimationFrame(animate);
-  
-      // Überprüfe, ob es Zeit ist, die FPS zu begrenzen
+
+      // Limit FPS
       if (now - startTime >= 1000 / desiredFPS) {
-        // Setze den Startzeitpunkt für den nächsten Frame
         startTime = now - (now - startTime) % (1000 / desiredFPS);
       }
     };
-  
-    // Starte die Animation
+
+    // Start the animation
     this.animationFrameId = requestAnimationFrame(animate);
   }
 
+
   // Funktion zum Aktualisieren des Spiels (Spieldaten, Bewegungen, etc.)
   private updateGame(elapsed: number): void {
-    // Hier erfolgt die Aktualisierungslogik, z.B. Spielerbewegungen, Kollisionen, etc.
+ // Apply friction to slow down the ship
+ this.shipVelocityX *= 1 - this.shipFriction;
+ this.shipVelocityY *= 1 - this.shipFriction;
 
-    // Handle Socket-Nachrichten vom Server (wenn erforderlich)
+ // Update the ship's position based on velocity
+ this.shipX += this.shipVelocityX;
+ this.shipY += this.shipVelocityY;
+
+ // Update the camera position based on the ship's movement
+ this.cameraX = this.shipX - this.canvasWidth / 2;
+ this.cameraY = this.shipY - this.canvasHeight / 2;
+
+ // Ensure the camera stays within the boundaries of the map
+ this.cameraX = Math.max(0, Math.min(this.cameraX, this.map[0].length * this.tileSize - this.canvasWidth));
+ this.cameraY = Math.max(0, Math.min(this.cameraY, this.map.length * this.tileSize - this.canvasHeight));
+
     this.socketService.onServerMessage(() => {
       // Hier kannst du Server-Nachrichten verarbeiten
     });
@@ -183,33 +213,74 @@ export class GameComponent implements OnInit, OnDestroy {
 
 
     this.drawTilemap();
-  }
-  @HostListener('document:keydown', ['$event'])
-  handleKeydownEvent(event: KeyboardEvent): void {
-    if (event.key === ' ' || event.code === 'Space') {
-      // Wenn die Leertaste gedrückt wird, rufe die "shoot"-Funktion auf
-      this.shoot();
-    } else {
-      // Kamera-Steuerung mit WASD-Tasten
-      const speed = 4; // Anpassen Sie die Geschwindigkeit nach Bedarf
 
-      switch (event.key) {
-        case 'w':
-          this.cameraY -= speed;
-          break;
-        case 'a':
-          this.cameraX -= speed;
-          break;
-        case 's':
-          this.cameraY += speed;
-          break;
-        case 'd':
-          this.cameraX += speed;
-          break;
-      }
-    }
+      // Zeichne das Raumschiff
+ // Zeichne das Raumschiff
+const shipImage = new Image();
+shipImage.src = 'assets/tilemap.png'; // Passe den Pfad entsprechend an
+const shipSize = 16; // Größe des Raumschiffs
+this.ctx.save();
+this.ctx.translate(this.canvasWidth / 2, this.canvasHeight / 2); // Canvas-Mittelpunkt
+this.ctx.rotate((this.shipAngle * Math.PI) / 180); // Winkel in Radian umwandeln und drehen
+this.ctx.drawImage(shipImage, 0, 0, shipSize, shipSize, -shipSize / 2, -shipSize / 2, shipSize, shipSize);
+this.ctx.restore();
   }
+  
+ // Event handler for keydown events
+ @HostListener('document:keydown', ['$event'])
+ handleKeydownEvent(event: KeyboardEvent): void {
+   // Umwandlung des Winkels in Radian
+   const shipAngleRad = (this.shipAngle * Math.PI) / 180;
+
+   let shipSpeedX = 0; // Geschwindigkeit in X-Richtung
+   let shipSpeedY = 0; // Geschwindigkeit in Y-Richtung
+
+   const acceleration = this.shipAcceleration; // Read acceleration from class property
+   const maxSpeed = this.shipMaxSpeed; // Read maxSpeed from class property
+   const rotationSpeed = this.shipRotationSpeed; // Read rotationSpeed from class property
+
+   switch (event.key) {
+     case 'w':
+       // Beschleunigen in die aktuelle Richtung
+       shipSpeedX += Math.cos(shipAngleRad) * acceleration;
+       shipSpeedY += Math.sin(shipAngleRad) * acceleration;
+       break;
+     case 's':
+       // Bremsen oder rückwärts fahren
+       shipSpeedX -= Math.cos(shipAngleRad) * acceleration;
+       shipSpeedY -= Math.sin(shipAngleRad) * acceleration;
+       break;
+     case 'a':
+       // Drehung nach links
+       this.shipAngle -= rotationSpeed;
+       break;
+     case 'd':
+       // Drehung nach rechts
+       this.shipAngle += rotationSpeed;
+       break;
+     default:
+       break;
+   }
+
+   // Normalize the ship's angle to be within 0 to 360 degrees
+   this.shipAngle = (this.shipAngle + 360) % 360;
+
+   // Begrenzen Sie die Geschwindigkeit des Raumschiffs
+   const currentSpeed = Math.sqrt(shipSpeedX * shipSpeedX + shipSpeedY * shipSpeedY);
+   if (currentSpeed > maxSpeed) {
+     const ratio = maxSpeed / currentSpeed;
+     shipSpeedX *= ratio;
+     shipSpeedY *= ratio;
+   }
+
+   // Aktualisieren der Position des Raumschiffs basierend auf der aktuellen Geschwindigkeit
+   this.shipVelocityX += shipSpeedX;
+   this.shipVelocityY += shipSpeedY;
+ }
+
+ // Event handler for keyup events (optional)
+ @HostListener('document:keyup', ['$event'])
+ handleKeyupEvent(event: KeyboardEvent): void {
+   // You can handle key release events here if needed.
+ }
 }
-
-
-

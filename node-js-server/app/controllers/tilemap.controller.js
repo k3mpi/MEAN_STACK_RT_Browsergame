@@ -1,5 +1,5 @@
 exports.createMap = (req, res) => {
-  const tilemapSize = 600;
+  const tilemapSize = 256;
   const tilemap = [];
 
   // Erstelle ein leeres 2D-Array
@@ -20,7 +20,7 @@ exports.createMap = (req, res) => {
   // Erstelle den mittleren Kreis
   const centerX = Math.floor(tilemapSize / 2);
   const centerY = Math.floor(tilemapSize / 2);
-  const middleCircleRadius = Math.floor(Math.random() * (400 - 18 + 1)) + 18;
+  const middleCircleRadius = Math.floor(Math.random() * (64 - 18 + 1)) + 18;
 
   for (let x = centerX - middleCircleRadius; x <= centerX + middleCircleRadius; x++) {
     for (let y = centerY - middleCircleRadius; y <= centerY + middleCircleRadius; y++) {
